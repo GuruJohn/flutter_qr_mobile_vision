@@ -203,10 +203,10 @@ class Preview extends StatelessWidget {
         int nativeOrientationInt;
         switch (nativeOrientation) {
           case NativeDeviceOrientation.landscapeLeft:
-            nativeOrientationInt = Platform.isAndroid ? 3 : 1;
+            nativeOrientationInt = 3; // Platform.isAndroid ? 3 : 1;
             break;
           case NativeDeviceOrientation.landscapeRight:
-            nativeOrientationInt = Platform.isAndroid ? 1 : 3;
+            nativeOrientationInt = 1; // Platform.isAndroid ? 1 : 3;
             break;
           case NativeDeviceOrientation.portraitDown:
             nativeOrientationInt = 2;
