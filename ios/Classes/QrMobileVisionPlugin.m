@@ -81,7 +81,7 @@
     output.videoSettings =
     @{(NSString *)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32BGRA) };
     [output setAlwaysDiscardsLateVideoFrames:YES];
-    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    dispatch_queue_t queue = dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0);
     [output setSampleBufferDelegate:self queue:queue];
     
     AVCaptureConnection *connection =
