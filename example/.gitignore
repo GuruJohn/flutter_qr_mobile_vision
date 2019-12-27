@@ -11,3 +11,5 @@ pubspec.lock
 .flutter-plugins
 .dart_tool/
 .flutter-plugins-dependencies/
+.project
+.settings/

@@ -10,3 +10,6 @@ pubspec.lock
 .flutter-plugins/
 .dart_tool/
 .flutter-plugins-dependencies
+android/.classpath
+android/.project
+android/.settings/
