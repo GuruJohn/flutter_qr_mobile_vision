@@ -39,25 +39,16 @@
     self = [super init];
     NSAssert(self, @"super init cannot be nil");
     _captureSession = [[AVCaptureSession alloc] init];
-    
+
+    AVCaptureDevicePosition _devicePosition = cameraDirection == 0 ? AVCaptureDevicePositionFront : AVCaptureDevicePositionBack;
+
     if (@available(iOS 10.0, *)) {
-        if (cameraDirection == 0) {
-            _captureDevice = [AVCaptureDevice defaultDeviceWithDeviceType:AVCaptureDeviceTypeBuiltInWideAngleCamera mediaType:AVMediaTypeVideo position:AVCaptureDevicePositionFront];
-        } else {
-            _captureDevice = [AVCaptureDevice defaultDeviceWithDeviceType:AVCaptureDeviceTypeBuiltInWideAngleCamera mediaType:AVMediaTypeVideo position:AVCaptureDevicePositionBack];
-        }
+        _captureDevice = [AVCaptureDevice defaultDeviceWithDeviceType:AVCaptureDeviceTypeBuiltInWideAngleCamera mediaType:AVMediaTypeVideo position:_devicePosition];
     } else {
         for(AVCaptureDevice* device in [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo]) {
-            if (cameraDirection == 0) {
-                if (device.position == AVCaptureDevicePositionFront) {
-                    _captureDevice = device;
-                    break;
-                }
-            } else {
-                if (device.position == AVCaptureDevicePositionBack) {
-                    _captureDevice = device;
-                    break;
-                }
+            if (device.position == _devicePosition) {
+                _captureDevice = device;
+                break;
             }
         }
 
@@ -65,9 +56,9 @@
             _captureDevice = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
         }
     }
-    
+
     _mainQueue = dispatch_get_main_queue();
-    
+
     NSError *localError = nil;
     AVCaptureInput *input = [AVCaptureDeviceInput deviceInputWithDevice:_captureDevice error:&localError];
     if (localError) {
@@ -75,25 +66,25 @@
         return nil;
     }
     _previewSize = CMVideoFormatDescriptionGetDimensions([[_captureDevice activeFormat] formatDescription]);
-    
+
     AVCaptureVideoDataOutput *output = [AVCaptureVideoDataOutput new];
-    
+
     output.videoSettings =
     @{(NSString *)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32BGRA) };
     [output setAlwaysDiscardsLateVideoFrames:YES];
     dispatch_queue_t queue = dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0);
     [output setSampleBufferDelegate:self queue:queue];
-    
+
     AVCaptureConnection *connection =
     [AVCaptureConnection connectionWithInputPorts:input.ports output:output];
     connection.videoOrientation = AVCaptureVideoOrientationPortrait;
-    
+
     [_captureSession addInputWithNoConnections:input];
     [_captureSession addOutputWithNoConnections:output];
     [_captureSession addConnection:connection];
-    
+
     _barcodeDetector = [GMVDetector detectorOfType:GMVDetectorTypeBarcode options:nil];
-    
+
     return self;
 }
 
@@ -124,9 +115,9 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
     // create a new buffer in the form of a CGImage containing the image.
     // NOTE: it must be released manually!
     CGImageRef cgImageRef = [self cgImageRefFromCMSampleBufferRef:sampleBuffer];
-    
+
     CVPixelBufferRef newBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
-    
+
     CFRetain(newBuffer);
     CVPixelBufferRef old = _latestPixelBuffer;
     while (!OSAtomicCompareAndSwapPtrBarrier(old, newBuffer, (void **)&_latestPixelBuffer)) {
@@ -135,22 +126,22 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
     if (old != nil) {
         CFRelease(old);
     }
-    
+
     dispatch_sync(_mainQueue, ^{
         self.onFrameAvailable();
     });
-    
+
     ///////// TODO: dispatch this to a background thread (or at least later on main thread?)!
     /// process the frame with GMV
     AVCaptureDevicePosition devicePosition = AVCaptureDevicePositionBack;
     UIDeviceOrientation deviceOrientation = [[UIDevice currentDevice] orientation];
     // TODO: last known orientation?
     GMVImageOrientation orientation = [GMVUtility imageOrientationFromOrientation:deviceOrientation withCaptureDevicePosition:devicePosition defaultDeviceOrientation:UIDeviceOrientationPortrait];
-    
+
     NSDictionary *options = @{
         GMVDetectorImageOrientation: @(orientation)
     };
-    
+
     UIImage *image = [UIImage imageWithCGImage:cgImageRef];
     NSArray<GMVBarcodeFeature *> *barcodes = [_barcodeDetector featuresInImage:image options:options];
     image = nil;
@@ -215,13 +206,13 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 }
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
-    
+
     if ([@"start" isEqualToString:call.method]) {
         // NSNumber *heartbeatTimeout = call.arguments[@"heartbeatTimeout"];
         NSNumber *targetWidth = call.arguments[@"targetWidth"];
         NSNumber *targetHeight = call.arguments[@"targetHeight"];
         NSNumber *cameraDirection = call.arguments[@"cameraDirection"];
-        
+
         if (targetWidth == nil || targetHeight == nil) {
             result([FlutterError errorWithCode:@"INVALID_ARGS"
                                        message: @"Missing a required argument"
@@ -237,7 +228,7 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
                      });
             } orFailure: ^ (NSError *error) {
                 result(error.flutterError);
-            } 
+            }
             cameraDirection: [cameraDirection intValue]
         ];
     } else if ([@"stop" isEqualToString:call.method]) {
@@ -254,7 +245,7 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 - (void)startWithCallback:(void (^)(int width, int height, int orientation, int64_t textureId))completedCallback
         orFailure:(void (^)(NSError *))failureCallback
         cameraDirection:(int)cameraDirection {
-    
+
     if (_reader) {
         failureCallback([NSError errorWithDomain:@"qr_mobile_vision" code:1 userInfo:@{NSLocalizedDescriptionKey:NSLocalizedString(@"Reader already running.", nil)}]);
         return;
